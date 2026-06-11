@@ -1,4 +1,4 @@
-// Motor algorítmico externo en JavaScript para procesamiento en la nube
+// Motor algorítmico externo en JavaScript para procesamiento de pares OTC
 function procesarEstrategiaOTC(datosVelaOTC) {
     const v1 = datosVelaOTC;
     const rangoVela = v1.high - v1.low;
@@ -22,6 +22,8 @@ function procesarEstrategiaOTC(datosVelaOTC) {
     const toqueResistencia = (v1.high >= (v1.sma35 - 0.00015) && v1.close < v1.sma35) || (v1.high >= (v1.sma55 - 0.00015) && v1.close < v1.sma55);
 
     const tablaHtml = document.getElementById('alertas-otc-container');
+
+    if(!tablaHtml) return;
 
     // DISPARO CALL - OTC
     if(estructuraAlcista && toqueSoporte && esPatronCompra && v1.rsi14 > 50 && v1.rsi3 < 20) {
