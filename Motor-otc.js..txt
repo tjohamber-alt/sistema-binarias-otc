@@ -1,10 +1,46 @@
-// Motor algorítmico externo en JavaScript para procesamiento de pares OTC
-function procesarEstrategiaOTC(datosVelaOTC) {
-    const v1 = datosVelaOTC;
+// --- CONFIGURACIÓN DE CONEXIÓN DIRECTA A OLYMP TRADE ---
+const PARES_OTC = ["EURUSD_otc", "GBPUSD_otc", "AUDUSD_otc", "USDCAD_otc"];
+const socket = new WebSocket("wss://api.olymptrade.com/ds/v6"); // Servidor oficial de datos
+
+socket.onopen = () => {
+    console.log("Conectado con éxito al servidor de Olymp Trade OTC");
+    // Nos suscribimos a los pares OTC elegidos
+    PARES_OTC.forEach(par => {
+        socket.send(JSON.stringify({ event: "subscribe", topic: `candle_${par}_5m` }));
+    });
+};
+
+socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    
+    // Validamos que el mensaje contenga una vela cerrada completa [1]
+    if (data.event === "candle" && data.data && data.data.is_closed) {
+        const vela = {
+            symbol: data.stream.replace("candle_", "").replace("_5m", "").toUpperCase(),
+            open: data.data.open,
+            close: data.data.close,
+            high: data.data.high,
+            low: data.data.low,
+            // Valores calculados por el servidor para los indicadores
+            ema50: data.data.indicators?.ema50 || 0,
+            ema100: data.data.indicators?.ema100 || 0,
+            ema200: data.data.indicators?.ema200 || 0,
+            sma35: data.data.indicators?.sma35 || 0,
+            sma55: data.data.indicators?.sma55 || 0,
+            rsi14: data.data.indicators?.rsi14 || 50,
+            rsi3: data.data.indicators?.rsi3 || 50
+        };
+        
+        procesarEstrategiaOTC(vela);
+    }
+};
+
+// --- FILTRO MAESTRO DE CONFLUENCIA MATEMÁTICA ---
+function procesarEstrategiaOTC(v1) {
     const rangoVela = v1.high - v1.low;
     if(rangoVela <= 0) return;
 
-    // Métricas del Módulo 4 (Cuerpo máximo del 30%, mecha de rechazo mínimo del 60%)
+    // Módulo 4: Proporciones de Acción del Precio (Cuerpo max 30%, Mechas min 60%)
     const cuerpo = Math.abs(v1.close - v1.open);
     const porcCuerpo = (cuerpo / rangoVela) * 100;
     const porcMechaInferior = ((Math.min(v1.open, v1.close) - v1.low) / rangoVela) * 100;
@@ -13,37 +49,35 @@ function procesarEstrategiaOTC(datosVelaOTC) {
     const esPatronCompra = (porcCuerpo <= 30.0) && (porcMechaInferior >= 60.0);
     const esPatronVenta = (porcCuerpo <= 30.0) && (porcMechaSuperior >= 60.0);
 
-    // Confluencias de Tendencia Principal (EMAs)
+    // Módulo 5: Confluencias de Tendencia (EMAs) y Toques (SMAs con margen de 1.5 pips)
     const estructuraAlcista = (v1.ema50 > v1.ema100) && (v1.ema100 > v1.ema200);
     const estructuraBajista = (v1.ema50 < v1.ema100) && (v1.ema100 < v1.ema200);
 
-    // Toques numéricos milimétricos (Tolerancia fija de 1.5 pips)
     const toqueSoporte = (v1.low <= (v1.sma35 + 0.00015) && v1.close > v1.sma35) || (v1.low <= (v1.sma55 + 0.00015) && v1.close > v1.sma55);
     const toqueResistencia = (v1.high >= (v1.sma35 - 0.00015) && v1.close < v1.sma35) || (v1.high >= (v1.sma55 - 0.00015) && v1.close < v1.sma55);
 
     const tablaHtml = document.getElementById('alertas-otc-container');
-
     if(!tablaHtml) return;
 
-    // DISPARO CALL - OTC
+    // DISPARO CALL
     if(estructuraAlcista && toqueSoporte && esPatronCompra && v1.rsi14 > 50 && v1.rsi3 < 20) {
         tablaHtml.innerHTML = `<tr>
-            <td><b>${v1.symbol} (OTC)</b></td>
+            <td><b>${v1.symbol}</b></td>
             <td><span class="badge-call">CALL</span></td>
             <td>5 MIN</td>
             <td>${v1.close.toFixed(5)}</td>
-            <td>Estructura EMA (+) Soporte SMA superado con rechazo del ${porcMechaInferior.toFixed(1)}% (+) RSI(3) en sobreventa.</td>
+            <td>Estructura Olymp Trade (+) Soporte superado con rechazo del ${porcMechaInferior.toFixed(1)}%.</td>
         </tr>` + tablaHtml.innerHTML;
     }
 
-    // DISPARO PUT - OTC
+    // DISPARO PUT
     if(estructuraBajista && toqueResistencia && esPatronVenta && v1.rsi14 < 50 && v1.rsi3 > 80) {
         tablaHtml.innerHTML = `<tr>
-            <td><b>${v1.symbol} (OTC)</b></td>
+            <td><b>${v1.symbol}</b></td>
             <td><span class="badge-put">PUT</span></td>
             <td>5 MIN</td>
             <td>${v1.close.toFixed(5)}</td>
-            <td>Estructura EMA (-) Resistencia SMA superada con rechazo del ${porcMechaSuperior.toFixed(1)}% (+) RSI(3) en sobrecompra.</td>
+            <td>Estructura Olymp Trade (-) Resistencia superada con rechazo del ${porcMechaSuperior.toFixed(1)}%.</td>
         </tr>` + tablaHtml.innerHTML;
     }
 }
