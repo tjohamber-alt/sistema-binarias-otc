@@ -1,0 +1,70 @@
+//+------------------------------------------------------------------+
+//|                                     Bot_Universal_MultiMercado.mq5|
+//|                                                       Gemini IA  |
+//+------------------------------------------------------------------+
+#property copyright "Gemini IA"
+#property link      ""
+#property version   "2.00"
+#property strict
+
+// --- Parámetros de Entrada ---
+input group "--- Configuración de Gestión ---"
+input double          Lotaje            = 0.1;           // Volumen / Lotes por operación
+input int             MargenPrecioPips  = 2;             // Tolerancia de toque en Pips/Puntos
+input ulong           MagicNumber       = 202606;        // Identificador único del Bot
+
+input group "--- Parámetros de Indicadores ---"
+input int             Periodo_EMA_50    = 50;
+input int             Periodo_EMA_100   = 100;
+input int             Periodo_EMA_200   = 200;
+input int             Periodo_SMA_35    = 35;
+input int             Periodo_SMA_55    = 55;
+
+// --- Variables Globales de Control ---
+datetime tiempo_ultima_vela;
+int handle_ema50, handle_ema100, handle_ema200;
+int handle_sma35, handle_sma55;
+int handle_rsi14, handle_rsi3;
+string activo_actual;
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Control Web - Solo Pares OTC</title>
+    <style>
+        body { background-color: #0c1017; color: #f0f4f8; font-family: 'Segoe UI', sans-serif; padding: 30px; margin: 0; }
+        .container { max-width: 1100px; margin: 0 auto; background-color: #161b22; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+        h1 { color: #58a6ff; text-align: center; margin-top: 0; font-size: 24px; letter-spacing: 1px; }
+        .status-box { display: flex; justify-content: space-between; background-color: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 25px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid #21262d; }
+        th { background-color: #1f242c; color: #58a6ff; font-size: 14px; text-transform: uppercase; }
+        .badge-call { color: #00ff88; font-weight: bold; background: rgba(0,255,136,0.1); padding: 6px 12px; border-radius: 4px; }
+        .badge-put { color: #ff3366; font-weight: bold; background: rgba(255,51,102,0.1); padding: 6px 12px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SISTEMA DE ALERTA ALGORÍTMICA OTC</h1>
+        <div class="status-box">
+            <div>Filtro Temporal: <span style="color:#ffb300">Vela Cerrada Confirmada [1]</span></div>
+            <div>Modo Operativo: <span style="color:#00ff88">Solo Activos Binarios OTC</span></div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Activo OTC</th>
+                    <th>Operación</th>
+                    <th>Expiración</th>
+                    <th>Precio Entrada</th>
+                    <th>Confluencias de Filtro Maestro Analizadas</th>
+                </tr>
+            </thead>
+            <tbody id="alertas-otc-container">
+                </tbody>
+        </table>
+    </div>
+    <script src="motor-otc.js"></script>
+</body>
+</html>

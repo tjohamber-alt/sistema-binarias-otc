@@ -1,0 +1,47 @@
+// Motor algorítmico externo en JavaScript para procesamiento en la nube
+function procesarEstrategiaOTC(datosVelaOTC) {
+    const v1 = datosVelaOTC;
+    const rangoVela = v1.high - v1.low;
+    if(rangoVela <= 0) return;
+
+    // Métricas del Módulo 4 (Cuerpo máximo del 30%, mecha de rechazo mínimo del 60%)
+    const cuerpo = Math.abs(v1.close - v1.open);
+    const porcCuerpo = (cuerpo / rangoVela) * 100;
+    const porcMechaInferior = ((Math.min(v1.open, v1.close) - v1.low) / rangoVela) * 100;
+    const porcMechaSuperior = ((v1.high - Math.max(v1.open, v1.close)) / rangoVela) * 100;
+
+    const esPatronCompra = (porcCuerpo <= 30.0) && (porcMechaInferior >= 60.0);
+    const esPatronVenta = (porcCuerpo <= 30.0) && (porcMechaSuperior >= 60.0);
+
+    // Confluencias de Tendencia Principal (EMAs)
+    const estructuraAlcista = (v1.ema50 > v1.ema100) && (v1.ema100 > v1.ema200);
+    const estructuraBajista = (v1.ema50 < v1.ema100) && (v1.ema100 < v1.ema200);
+
+    // Toques numéricos milimétricos (Tolerancia fija de 1.5 pips)
+    const toqueSoporte = (v1.low <= (v1.sma35 + 0.00015) && v1.close > v1.sma35) || (v1.low <= (v1.sma55 + 0.00015) && v1.close > v1.sma55);
+    const toqueResistencia = (v1.high >= (v1.sma35 - 0.00015) && v1.close < v1.sma35) || (v1.high >= (v1.sma55 - 0.00015) && v1.close < v1.sma55);
+
+    const tablaHtml = document.getElementById('alertas-otc-container');
+
+    // DISPARO CALL - OTC
+    if(estructuraAlcista && toqueSoporte && esPatronCompra && v1.rsi14 > 50 && v1.rsi3 < 20) {
+        tablaHtml.innerHTML = `<tr>
+            <td><b>${v1.symbol} (OTC)</b></td>
+            <td><span class="badge-call">CALL</span></td>
+            <td>5 MIN</td>
+            <td>${v1.close.toFixed(5)}</td>
+            <td>Estructura EMA (+) Soporte SMA superado con rechazo del ${porcMechaInferior.toFixed(1)}% (+) RSI(3) en sobreventa.</td>
+        </tr>` + tablaHtml.innerHTML;
+    }
+
+    // DISPARO PUT - OTC
+    if(estructuraBajista && toqueResistencia && esPatronVenta && v1.rsi14 < 50 && v1.rsi3 > 80) {
+        tablaHtml.innerHTML = `<tr>
+            <td><b>${v1.symbol} (OTC)</b></td>
+            <td><span class="badge-put">PUT</span></td>
+            <td>5 MIN</td>
+            <td>${v1.close.toFixed(5)}</td>
+            <td>Estructura EMA (-) Resistencia SMA superada con rechazo del ${porcMechaSuperior.toFixed(1)}% (+) RSI(3) en sobrecompra.</td>
+        </tr>` + tablaHtml.innerHTML;
+    }
+}
