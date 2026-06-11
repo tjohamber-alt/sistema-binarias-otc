@@ -1,32 +1,3 @@
-//+------------------------------------------------------------------+
-//|                                     Bot_Universal_MultiMercado.mq5|
-//|                                                       Gemini IA  |
-//+------------------------------------------------------------------+
-#property copyright "Gemini IA"
-#property link      ""
-#property version   "2.00"
-#property strict
-
-// --- Parámetros de Entrada ---
-input group "--- Configuración de Gestión ---"
-input double          Lotaje            = 0.1;           // Volumen / Lotes por operación
-input int             MargenPrecioPips  = 2;             // Tolerancia de toque en Pips/Puntos
-input ulong           MagicNumber       = 202606;        // Identificador único del Bot
-
-input group "--- Parámetros de Indicadores ---"
-input int             Periodo_EMA_50    = 50;
-input int             Periodo_EMA_100   = 100;
-input int             Periodo_EMA_200   = 200;
-input int             Periodo_SMA_35    = 35;
-input int             Periodo_SMA_55    = 55;
-
-// --- Variables Globales de Control ---
-datetime tiempo_ultima_vela;
-int handle_ema50, handle_ema100, handle_ema200;
-int handle_sma35, handle_sma55;
-int handle_rsi14, handle_rsi3;
-string activo_actual;
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
