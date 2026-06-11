@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -20,7 +20,7 @@
         <h1>SISTEMA DE ALERTA ALGORÍTMICA OTC</h1>
         <div class="status-box">
             <div>Filtro Temporal: <span style="color:#ffb300">Vela Cerrada Confirmada [1]</span></div>
-            <div>Modo Operativo: <span style="color:#00ff88">Solo Activos Binarios OTC</span></div>
+            <div>Modo Operativo: <span style="color:#00ff88">Solo Activos Binarios Olymp Trade OTC</span></div>
         </div>
         <table>
             <thead>
@@ -36,6 +36,94 @@
                 </tbody>
         </table>
     </div>
-    <script src="motor-otc.js"></script>
+
+    <script>
+        // --- CONEXIÓN DIRECTA AL FLUJO DE DATOS DE OLYMP TRADE ---
+        const PARES_OTC = ["EURUSD_otc", "GBPUSD_otc", "AUDUSD_otc", "USDCAD_otc"];
+        let socket;
+
+        function conectarWebSocket() {
+            socket = new WebSocket("wss://api.olymptrade.com/ds/v6");
+
+            socket.onopen = () => {
+                console.log("Conectado con éxito al servidor de Olymp Trade OTC");
+                PARES_OTC.forEach(par => {
+                    socket.send(JSON.stringify({ event: "subscribe", topic: `candle_${par}_5m` }));
+                });
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.event === "candle" && data.data && data.data.is_closed) {
+                    const vela = {
+                        symbol: data.stream.replace("candle_", "").replace("_5m", "").toUpperCase(),
+                        open: data.data.open,
+                        close: data.data.close,
+                        high: data.data.high,
+                        low: data.data.low,
+                        ema50: data.data.indicators?.ema50 || 0,
+                        ema100: data.data.indicators?.ema100 || 0,
+                        ema200: data.data.indicators?.ema200 || 0,
+                        sma35: data.data.indicators?.sma35 || 0,
+                        sma55: data.data.indicators?.sma55 || 0,
+                        rsi14: data.data.indicators?.rsi14 || 50,
+                        rsi3: data.data.indicators?.rsi3 || 50
+                    };
+                    procesarEstrategiaOTC(vela);
+                }
+            };
+
+            socket.onerror = (error) => console.log("Error en la red de datos: ", error);
+            socket.onclose = () => setTimeout(conectarWebSocket, 5000); // Reconexión si se cae
+        }
+
+        // --- FILTRO MAESTRO DE CONFLUENCIA MATEMÁTICA ---
+        function procesarEstrategiaOTC(v1) {
+            const rangoVela = v1.high - v1.low;
+            if(rangoVela <= 0) return;
+
+            const cuerpo = Math.abs(v1.close - v1.open);
+            const porcCuerpo = (cuerpo / rangoVela) * 100;
+            const porcMechaInferior = ((Math.min(v1.open, v1.close) - v1.low) / rangoVela) * 100;
+            const porcMechaSuperior = ((v1.high - Math.max(v1.open, v1.close)) / rangoVela) * 100;
+
+            const esPatronCompra = (porcCuerpo <= 30.0) && (porcMechaInferior >= 60.0);
+            const esPatronVenta = (porcCuerpo <= 30.0) && (porcMechaSuperior >= 60.0);
+
+            const estructuraAlcista = (v1.ema50 > v1.ema100) && (v1.ema100 > v1.ema200);
+            const estructuraBajista = (v1.ema50 < v1.ema100) && (v1.ema100 < v1.ema200);
+
+            const toqueSoporte = (v1.low <= (v1.sma35 + 0.00015) && v1.close > v1.sma35) || (v1.low <= (v1.sma55 + 0.00015) && v1.close > v1.sma55);
+            const toqueResistencia = (v1.high >= (v1.sma35 - 0.00015) && v1.close < v1.sma35) || (v1.high >= (v1.sma55 - 0.00015) && v1.close < v1.sma55);
+
+            const tablaHtml = document.getElementById('alertas-otc-container');
+            if(!tablaHtml) return;
+
+            // DISPARO CALL
+            if(estructuraAlcista && toqueSoporte && esPatronCompra && v1.rsi14 > 50 && v1.rsi3 < 20) {
+                tablaHtml.innerHTML = `<tr>
+                    <td><b>${v1.symbol}</b></td>
+                    <td><span class="badge-call">CALL</span></td>
+                    <td>5 MIN</td>
+                    <td>${v1.close.toFixed(5)}</td>
+                    <td>Estructura Olymp Trade (+) Soporte superado con rechazo del ${porcMechaInferior.toFixed(1)}%.</td>
+                </tr>` + tablaHtml.innerHTML;
+            }
+
+            // DISPARO PUT
+            if(estructuraBajista && toqueResistencia && esPatronVenta && v1.rsi14 < 50 && v1.rsi3 > 80) {
+                tablaHtml.innerHTML = `<tr>
+                    <td><b>${v1.symbol}</b></td>
+                    <td><span class="badge-put">PUT</span></td>
+                    <td>5 MIN</td>
+                    <td>${v1.close.toFixed(5)}</td>
+                    <td>Estructura Olymp Trade (-) Resistencia superada con rechazo del ${porcMechaSuperior.toFixed(1)}%.</td>
+                </tr>` + tablaHtml.innerHTML;
+            }
+        }
+
+        // Iniciar el sistema al cargar la página
+        conectarWebSocket();
+    </script>
 </body>
 </html>
